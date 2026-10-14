@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>prosemirror-excel-paste demo</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    #editor { border: 1px solid #bbb; border-radius: 6px; padding: .75rem 1rem; min-height: 220px; }
+    .ProseMirror { outline: none; }
+    .ProseMirror table { border-collapse: collapse; margin: .5rem 0; }
+    .ProseMirror td, .ProseMirror th { border: 1px dashed #ddd; padding: 2px 6px; vertical-align: top; }
+    .ProseMirror td p { margin: 0; }
+    .row { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+    .row > div { flex: 1 1 320px; min-width: 0; }
+    textarea { width: 100%; height: 220px; font: 12px/1.4 ui-monospace, monospace; box-sizing: border-box; }
+    label { font-weight: 600; display: block; margin-bottom: .25rem; }
+    .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>Вставка из Excel → ProseMirror</h1>
+  <p>Скопируйте диапазон в Excel / Google Sheets / LibreOffice и нажмите Ctrl+V в редакторе.
+     Курсор внутри таблицы — вставит диапазон в неё начиная с этой ячейки.</p>
+  <div class="controls">
+    <label><input type="checkbox" id="enabled" checked> плагин включён</label>
+    <label><input type="checkbox" id="tsv"> TSV из plain text</label>
+    <button id="insert-table">Вставить пустую таблицу 4×4</button>
+  </div>
+  <div id="editor"></div>
+  <div class="row">
+    <div>
+      <label for="raw">Сырой text/html из буфера (сохраните как фикстуру в test/fixtures)</label>
+      <textarea id="raw" readonly></textarea>
+      <button id="save-raw">Скачать .html</button>
+    </div>
+    <div>
+      <label for="out">После transformSpreadsheetHTML</label>
+      <textarea id="out" readonly></textarea>
+    </div>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

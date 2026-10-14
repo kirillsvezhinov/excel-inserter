@@ -1,0 +1,8 @@
+export { excelPaste, excelPasteKey, transformSpreadsheetHTML } from './plugin.js'
+export { parseSpreadsheetHTML } from './parse.js'
+export { renderTableHTML } from './render.js'
+export { parseTSV, looksLikeTSV, tsvToModel } from './tsv.js'
+export { detectSource } from './detect.js'
+export { excelCellAttributes, excelMarks } from './schema.js'
+export { normalizeColor, normalizeBorder } from './css.js'
+export { DEFAULT_OPTIONS } from './options.js'
