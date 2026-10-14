@@ -4,6 +4,11 @@
  * @returns {string[][]}
  */
 export function parseTSV(text) {
+  return parseDelimited(text, '\t')
+}
+
+/** Same as parseTSV with any single-character delimiter (`,` `;` `|` …). */
+export function parseDelimited(text, delim) {
   const s = String(text).replace(/\r\n?/g, '\n')
   const rows = []
   let row = []
@@ -25,7 +30,7 @@ export function parseTSV(text) {
         }
         value += s[j++]
       }
-      if (j !== -1 && (j === s.length || s[j] === '\t' || s[j] === '\n')) {
+      if (j !== -1 && (j === s.length || s[j] === delim || s[j] === '\n')) {
         field = value
         i = j
         fieldStart = false
@@ -33,7 +38,7 @@ export function parseTSV(text) {
       }
     }
     fieldStart = false
-    if (ch === '\t') { row.push(field); field = ''; fieldStart = true }
+    if (ch === delim) { row.push(field); field = ''; fieldStart = true }
     else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; fieldStart = true }
     else field += ch
     i++
@@ -49,11 +54,13 @@ export function looksLikeTSV(rows) {
   return width >= 2 && rows.every((r) => r.length === width)
 }
 
-/** Build a table model (see parseSpreadsheetHTML) from TSV rows. */
-export function tsvToModel(rows) {
+const NUMERIC = /^[-+(]?[$€£¥₽]?\s?\d[\d\s\u00a0\u202f.,']*(?:[eE][-+]?\d+)?\s?[%$€£¥₽)]?$/
+
+/** Build a table model (see parseSpreadsheetHTML) from TSV rows; numeric-looking cells are right-aligned. */
+export function tsvToModel(rows, source = 'tsv') {
   const width = rows.reduce((w, r) => Math.max(w, r.length), 0)
   return {
-    source: 'tsv',
+    source,
     width,
     height: rows.length,
     colWidths: null,
@@ -65,7 +72,8 @@ export function tsvToModel(rows) {
           if (k) runs.push({ br: true })
           if (line) runs.push({ text: line, marks: {} })
         })
-        return { colspan: 1, rowspan: 1, style: {}, content: [runs] }
+        const style = NUMERIC.test((r[c] ?? '').trim()) ? { textAlign: 'right' } : {}
+        return { colspan: 1, rowspan: 1, style, content: [runs] }
       })
     )
   }

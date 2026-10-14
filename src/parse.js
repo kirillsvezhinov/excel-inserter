@@ -1,9 +1,9 @@
 import {
-  StyleSheet, SIDES, isBold, normalizeColor, parseDeclarations, primaryFontFamily,
-  resolveBorder, sanitizeFontFamily, toPt
+  StyleSheet, SIDES, isBold, normalizeColor, parseDeclarations, resolveBorder, sanitizeFontFamily, toPt
 } from './css.js'
 import { detectSource } from './detect.js'
 import { resolveOptions } from './options.js'
+import { assembleModel, marksFor, sameMarks } from './model.js'
 
 // Elements whose content never becomes cell text.
 const SKIP_TAGS = new Set([
@@ -83,7 +83,7 @@ function verticalAlignValue(v) {
   return undefined
 }
 
-function safeHref(href) {
+export function safeHref(href) {
   if (!href) return null
   const h = href.trim()
   return /^(https?:|mailto:|tel:)/i.test(h) ? h : null
@@ -177,29 +177,6 @@ class Context {
     this.stateCache.set(el, s)
     return s
   }
-}
-
-function marksFor(s, base, styles) {
-  const m = {}
-  if (styles.bold && s.bold && !base.bold) m.bold = true
-  if (styles.italic && s.italic && !base.italic) m.italic = true
-  if (styles.underline && s.underline && !base.underline && !s.link) m.underline = true
-  if (styles.strikethrough && s.strike && !base.strike) m.strike = true
-  if (styles.script && s.script) m[s.script] = true
-  if (styles.color && s.color && s.color !== base.color && !s.link) m.color = s.color
-  if (styles.fontSize && s.fontSize && (!base.fontSize || Math.abs(s.fontSize - base.fontSize) > 0.05)) {
-    m.fontSize = `${s.fontSize}pt`
-  }
-  if (styles.fontFamily && s.fontFamily && primaryFontFamily(s.fontFamily) !== primaryFontFamily(base.fontFamily)) {
-    m.fontFamily = s.fontFamily
-  }
-  if (styles.links && s.link) m.link = s.link
-  return m
-}
-
-const sameMarks = (a, b) => {
-  const ka = Object.keys(a)
-  return ka.length === Object.keys(b).length && ka.every((k) => a[k] === b[k])
 }
 
 /** Turn a cell's DOM into paragraphs of styled runs. */
@@ -352,7 +329,7 @@ export function parseSpreadsheetHTML(html, options) {
       c += colspan
     }
   })
-  let width = occupied.reduce((w, row) => Math.max(w, row ? row.length : 0), 0)
+  const width = occupied.reduce((w, row) => Math.max(w, row ? row.length : 0), 0)
   if (!width || !nRows) return null
 
   // Column metadata from <col>/<colgroup>.
@@ -382,55 +359,13 @@ export function parseSpreadsheetHTML(html, options) {
     if (own.length && own.every((p) => p.hidden)) hiddenCols[c] = true
   }
 
-  // Pass 2: drop hidden rows/columns and remap coordinates.
-  const keepRow = (r) => !(opts.skipHidden && hiddenRows[r])
-  const keepCol = (c) => !(opts.skipHidden && hiddenCols[c])
-  const rowMap = []
-  let nr = 0
-  for (let r = 0; r < nRows; r++) rowMap[r] = keepRow(r) ? nr++ : -1
-  const colMap = []
-  let nc = 0
-  for (let c = 0; c < width; c++) colMap[c] = keepCol(c) ? nc++ : -1
-  if (!nr || !nc) return null
-
-  const grid = Array.from({ length: nr }, () => [])
-  const filled = Array.from({ length: nr }, () => [])
-  for (const p of placements) {
-    if (opts.skipHidden && p.hidden) continue
-    const rows = []
-    for (let r = p.row; r < p.row + p.rowspan; r++) if (rowMap[r] >= 0) rows.push(rowMap[r])
-    const cols = []
-    for (let c = p.col; c < p.col + p.colspan; c++) if (colMap[c] >= 0) cols.push(colMap[c])
-    if (!rows.length || !cols.length) continue
-    const cell = buildCell(p, ctx, base, opts)
-    cell.colspan = cols.length
-    cell.rowspan = rows.length
-    grid[rows[0]].push({ col: cols[0], cell })
-    for (const r of rows) for (const c of cols) filled[r][c] = true
-  }
-  // Partial selections and ragged rows: pad to a rectangle with empty cells.
-  for (let r = 0; r < nr; r++) {
-    for (let c = 0; c < nc; c++) {
-      if (!filled[r][c]) grid[r].push({ col: c, cell: emptyCell() })
-    }
-    grid[r].sort((a, b) => a.col - b.col)
-  }
-
-  const widths = opts.columnWidths ? colMap.map((m, c) => (m >= 0 ? colWidths[c] ?? null : undefined)).filter((w) => w !== undefined) : null
-  return {
-    source,
-    width: nc,
-    height: nr,
-    colWidths: widths && widths.some((w) => w) ? widths : null,
-    rows: grid.map((row) => row.map((x) => x.cell))
-  }
+  return assembleModel({
+    source, placements, nRows, width, hiddenRows, hiddenCols, colWidths, opts,
+    build: (p) => buildCell(p, ctx, base)
+  })
 }
 
-function emptyCell() {
-  return { colspan: 1, rowspan: 1, style: {}, content: [[]] }
-}
-
-function buildCell(p, ctx, base, opts) {
+function buildCell(p, ctx, base) {
   const rowState = ctx.stateFor(p.td.parentElement)
   const cellState = applyDecls(rowState, p.d, false)
   cellState.background = normalizeColor(p.d['background-color']) || rowState.background
@@ -440,12 +375,7 @@ function buildCell(p, ctx, base, opts) {
     if (p.overflow !== 'first') delete style.borderLeft
     if (p.overflow !== 'last') delete style.borderRight
   }
-  return {
-    colspan: 1,
-    rowspan: 1,
-    style,
-    content: p.filler ? [[]] : extractContent(p.td, cellState, base, ctx)
-  }
+  return { style, content: p.filler ? [[]] : extractContent(p.td, cellState, base, ctx) }
 }
 
 export { stripClipboardHeader }

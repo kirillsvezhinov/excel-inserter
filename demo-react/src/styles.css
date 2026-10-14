@@ -24,3 +24,9 @@ select { font: inherit; }
 .tabs button.active { background: #1f2328; color: #fff; border-color: #1f2328; }
 .badge { font-size: .8rem; padding: .1rem .5rem; border-radius: 999px; background: #ddf4ff; color: #0969da; }
 .inspector pre { margin: 0; padding: .75rem 1rem; max-height: 420px; overflow: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+
+.file-status { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; padding: .4rem .75rem; border-radius: 6px; font-size: .9rem; background: #ddf4ff; color: #0a3069; }
+.file-status.error { background: #ffebe9; color: #82071e; }
+.file-status.done { background: #dafbe1; color: #116329; }
+.file-status button { margin-left: auto; padding: 0 .5rem; border: none; background: transparent; font-size: 1.1rem; }
+code { font: .9em ui-monospace, monospace; background: #eff1f3; padding: 0 3px; border-radius: 3px; }

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Editor, schema } from './Editor.jsx'
-import { transformSpreadsheetHTML, parseSpreadsheetHTML } from '../../src/index.js'
+import { transformSpreadsheetHTML, parseSpreadsheetHTML, renderTableHTML } from '../../src/index.js'
 
 const STYLE_KEYS = ['background', 'borders', 'textAlign', 'verticalAlign', 'color', 'fontSize', 'fontFamily', 'links']
 
@@ -14,13 +14,30 @@ export function App() {
   const [clip, setClip] = useState(null)
   const [docJSON, setDocJSON] = useState('')
   const [tab, setTab] = useState('raw')
+  const [cf, setCf] = useState(true)
+  // { state: 'loading' | 'done' | 'error', name, message?, sheet? }
+  const [fileStatus, setFileStatus] = useState(null)
 
   const options = useMemo(
-    () => (enabled ? { singleCell, lineBreaks, tsv, styles } : null),
-    [enabled, singleCell, lineBreaks, tsv, styles]
+    () => (enabled ? {
+      singleCell, lineBreaks, tsv, styles,
+      files: {
+        conditionalFormatting: cf,
+        onLoadStart: (file) => setFileStatus({ state: 'loading', name: file.name }),
+        onLoad: (file, sheet) => {
+          setFileStatus({ state: 'done', name: file.name, sheet })
+          setClip({ file: file.name, sheet })
+        },
+        onError: (err, file) => setFileStatus({ state: 'error', name: file.name, message: err.message })
+      }
+    } : null),
+    [enabled, singleCell, lineBreaks, tsv, styles, cf]
   )
 
   const result = useMemo(() => {
+    if (clip?.sheet && options) {
+      return { model: clip.sheet.model, html: renderTableHTML(clip.sheet.model, options) }
+    }
     if (!clip?.html || !options) return null
     return {
       model: parseSpreadsheetHTML(clip.html, options),
@@ -51,7 +68,7 @@ export function App() {
   }
 
   const panel = {
-    raw: clip ? clip.html || `(нет text/html)\n\n${clip.text}` : '',
+    raw: clip?.sheet ? `(файл ${clip.file} — читается напрямую, без text/html)` : clip ? clip.html || `(нет text/html)\n\n${clip.text}` : '',
     out: result?.html ?? '',
     model: result?.model ? JSON.stringify(result.model, null, 2) : '',
     doc: docJSON
@@ -64,7 +81,8 @@ export function App() {
         <p>
           Скопируйте диапазон в Excel / Google Sheets / LibreOffice и нажмите <kbd>Ctrl</kbd>+<kbd>V</kbd>.
           Курсор внутри таблицы — диапазон встанет в неё, начиная с этой ячейки; выделите ячейки
-          мышью — заполнит выделение.
+          мышью — заполнит выделение. Можно скопировать сам файл <code>.xlsx</code> / <code>.csv</code> в
+          Finder или Проводнике и вставить его — из книги берётся только первый лист.
         </p>
       </header>
 
@@ -85,6 +103,7 @@ export function App() {
           </select>
         </label>
         <label><input type="checkbox" checked={tsv} disabled={!enabled} onChange={(e) => setTsv(e.target.checked)} /> TSV → таблица</label>
+        <label><input type="checkbox" checked={cf} disabled={!enabled} onChange={(e) => setCf(e.target.checked)} /> условное форматирование</label>
         <span className="spacer" />
         <button onClick={insertTable}>Пустая таблица 4×4</button>
         <button onClick={clear}>Очистить</button>
@@ -104,10 +123,24 @@ export function App() {
         ))}
       </div>
 
+      {fileStatus && (
+        <div className={`file-status ${fileStatus.state}`}>
+          {fileStatus.state === 'loading' && <>Читаю <b>{fileStatus.name}</b>…</>}
+          {fileStatus.state === 'done' && (
+            <>
+              Вставлен <b>{fileStatus.name}</b>: лист «{fileStatus.sheet.name}», {fileStatus.sheet.model.height}×{fileStatus.sheet.model.width}
+              {fileStatus.sheet.model.truncated && ' (обрезано)'}
+            </>
+          )}
+          {fileStatus.state === 'error' && <>Не удалось прочитать <b>{fileStatus.name}</b>: {fileStatus.message}</>}
+          <button onClick={() => setFileStatus(null)} aria-label="Скрыть">×</button>
+        </div>
+      )}
+
       <Editor
         options={options}
         viewRef={viewRef}
-        onPaste={setClip}
+        onPaste={(c) => { if (c.html || c.text) setClip(c) }}
         onChange={(doc) => setDocJSON(JSON.stringify(doc.toJSON(), null, 2))}
       />
 
@@ -117,7 +150,7 @@ export function App() {
             <button key={id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>{label}</button>
           ))}
           <span className="spacer" />
-          {result?.model && <span className="badge">{result.model.source} · {result.model.height}×{result.model.width}</span>}
+          {result?.model && <span className="badge">{result.model.sheet ?? result.model.source} · {result.model.height}×{result.model.width}</span>}
           <button onClick={saveRaw} disabled={!clip?.html}>Скачать как фикстуру</button>
         </div>
         <pre>{panel || 'Вставьте что-нибудь в редактор.'}</pre>

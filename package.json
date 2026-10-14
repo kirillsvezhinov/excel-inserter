@@ -19,7 +19,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo": "vite demo",
-    "demo:react": "vite demo-react"
+    "demo:react": "vite demo-react",
+    "fixtures": "node test/generate-fixtures.js",
+    "random-xlsx": "node test/random-xlsx.js"
   },
   "peerDependencies": {
     "prosemirror-model": "^1.19.0",
